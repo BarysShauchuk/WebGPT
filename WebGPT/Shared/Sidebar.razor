@@ -1,0 +1,65 @@
+﻿@using WebGPT.Data;
+@using WebGPT.Pages;
+@using WebGPT.Data.ChatService;
+@inject IChatService AiChatService;
+@inject NavigationManager NavigationManager;
+
+<div class="rounded border flex-grow-1 d-flex flex-column p-1" style="height: calc(100vh - 1rem);">
+    <a href="https://github.com/BarysShauchuk" target="_blank" class="btn btn-light text-start rounded-1 d-flex align-items-center p-2 mb-1 circled-light-pointer right-onhover-pointer" style="height: 75px;">
+        <img class="h-75 rounded-circle circled-light" src="https://avatars.githubusercontent.com/u/80849727?v=4" alt="Barys image" />
+        <div class="ms-2" style="line-height: 18px;">
+            Created by <br />
+            <b>Barys Shauchuk</b>
+        </div>
+        <i class="bi bi-box-arrow-up-right fs-5 ms-auto me-3 right-onhover"></i>
+    </a>
+    <div class="text-light p-1 overflow-auto fw-light">
+        <h5>
+            WebGPT
+        </h5>
+        <p>
+            This is an Artificial Intelligence. It uses OpenAI's GPT-3.5 API together with Google Search API. It can everything GPT-3.5 can, but with up-to-date answers, based on Google search results.
+        </p>
+        <h6>
+            Disclaimer
+        </h6>
+        <p>
+            This AI may answer with unappropriated, unethical or illegal content. Please do not bla-bla-bla. Using this app you agree that such kind of content doesn't injures you and you bla-bla-bla
+        </p>
+        <h6>
+            Used APIs
+        </h6>
+        <ul class="ps-4">
+            <li>
+                <a class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover" href="https://platform.openai.com/docs/guides/gpt/chat-completions-api" target="_blank">OpenAI's GPT-3.5 Turbo API</a>
+            </li>
+            <li>
+                <a class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover" href="https://developers.google.com/custom-search/v1/overview" target="_blank">Google Search API</a>
+            </li>
+            <li>
+                <a class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover" href="https://docs.gitlab.com/ee/api/markdown.html" target="_blank">GitLab Markdown API</a>
+            </li>
+            <li>
+                <a class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover" href="https://getbootstrap.com/" target="_blank">Bootstrap styles</a>
+            </li>
+            <li>
+                <a class="link-light link-offset-2 link-underline-opacity-25 link-underline-opacity-100-hover" href="https://icons.getbootstrap.com/" target="_blank">Bootstrap icons</a>
+            </li>
+        </ul>
+    </div>
+    <div class="mt-auto">
+        <button @onclick="StartOver"
+            class="btn btn-outline-danger mt-1 w-100 rotate-45-pointer">
+            <i class="bi bi-arrow-clockwise me-1 rotate-45"></i>
+            Start over
+        </button>
+    </div>
+</div>
+
+@code {
+    async Task StartOver()
+    {
+        await AiChatService.ClearConversationAsync();
+        NavigationManager.NavigateTo("/", true);
+    }
+}

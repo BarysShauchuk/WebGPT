@@ -1,0 +1,182 @@
+﻿@page "/"
+@using WebGPT.Data
+@using WebGPT.Data.ChatService;
+@using WebGPT.Data.Models;
+@inject IChatService AiChatService
+@inject IJSRuntime JsRuntime
+
+<PageTitle>WebGPT - Chat</PageTitle>
+
+<div class="flex-grow-1 p-2 pt-0 d-flex flex-column overflow-auto" id="messages">
+    @if(AiChatService.Conversation.Count == 0)
+    {
+        <div class="text-light m-auto  d-flex flex-column align-items-center">
+            No questions yet? Let's start the conversation!
+            <div class="d-flex mt-3 ms-2">
+                @foreach(var question in suggestedQuestions)
+                {
+                    <button @onclick="async () => await QuickAnswerAsync(question[0])" class="btn btn-outline-light me-2 py-2 px-3 maximize-onhover-pointer">
+                        <i class=@(question[1] + " maximize-onhover me-2")></i>
+                        @question[0]
+                    </button>
+                }
+            </div>
+        </div>
+    }
+
+    @foreach(var qa in AiChatService.Conversation)
+    {
+
+        <div class="text-light border rounded-1 p-2 align-self-end mb-3 text-wrapped" style="max-width: 75%;">
+            @qa.Question
+        </div>
+
+        if (qa == lastQa)
+        {
+            <div id="last-qa"></div>
+        }
+
+        if (qa.Answer is not null)
+        {
+            <div class="bg-light border rounded-1 p-2 align-self-start mb-3 p_m-0" style="max-width: 75%;">
+                @((MarkupString)qa.Answer)
+            </div>
+        }
+        else if (qa != lastQa || !isAnswering)
+        {
+            <div class="bg-light text-danger fw-bold border border-danger rounded-1 p-2 align-self-start mb-3" style="max-width: 75%;">
+                Question was canceled.
+            </div>
+        }
+    }
+
+    @if (isAnswering)
+    {
+        <div class="bg-light border rounded-1 p-3  align-self-start mb-3 d-flex align-items-center">
+            <div class="spinner-grow me-3" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <b class="me-2">
+                Generating answer...
+            </b>
+            <button @onclick="CancelQuestionAsync" class="btn btn-outline-danger ms-5 minimize-onhover-pointer">
+                <i class="bi bi-dash-square-fill me-2 minimize-onhover"></i>
+                Cancel
+            </button>
+        </div>
+    }
+
+</div>
+<div class="d-flex bg-light p-1 m-1 rounded-1">
+    <InputTextArea @bind-Value="@inputText" @onkeydown="TextareaKeyPress" @ref="textarea"
+        class="w-100 border-0 p-1 me-1" rows="4" style="resize: none; outline: none;"
+        placeholder="Ask me anything..." />
+    <div class="d-flex flex-column">
+        <button @ref="sendButton" @onfocus="SubmitOnFocus" disabled="@isAnswering" 
+            @onclick="AnswerQuestionAsync" class="btn btn-light w-100 h-50 mb-1 rotate-back-45-pointer">
+            <i class="bi bi-send-fill rotate-back-45"></i>
+        </button>
+    </div>
+</div>
+
+@code {
+        QuestionAnswer? lastQa => AiChatService.Conversation.LastOrDefault();
+        bool isAnswering => AiChatService.AnswerQuestionCancellationTokenSource is not null;
+        string inputText = "";
+
+        ElementReference sendButton;
+        InputTextArea? textarea;
+
+        bool shouldScroll = true;
+        bool shouldSubmit = false;
+
+        string[][] suggestedQuestions = new string[][]
+        {
+        new[] { "Tell about yourself", "bi bi-stars" },
+        new[] { "What's the weather like today?", "bi bi-cloud-moon-fill"},
+        new[] { "Places to visit in Kaunas", "bi bi-buildings" }
+    };
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+
+        if (firstRender)
+        {
+            if (textarea?.Element is not null)
+            {
+                await textarea.Element.Value.FocusAsync();
+            }
+        }
+
+        if (shouldScroll)
+        {
+            await JsRuntime.InvokeVoidAsync("scrollToBottom");
+            shouldScroll = false;
+        }
+    }
+
+
+    async Task TextareaKeyPress(KeyboardEventArgs e)
+    {
+        if (e.Code == "Enter" && !e.ShiftKey)
+        {
+            shouldSubmit = true;
+            await sendButton.FocusAsync();
+        }
+    }
+
+    async Task SubmitOnFocus()
+    {
+        if (string.IsNullOrWhiteSpace(inputText) && textarea?.Element is not null)
+        {
+            await textarea.Element.Value.FocusAsync();
+        }
+
+        if (shouldSubmit)
+        {
+            shouldSubmit = false;
+            await AnswerQuestionAsync();
+        }
+    }
+
+    async Task AnswerQuestionAsync()
+    {
+        var text = inputText.Trim();
+
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        var qa = new QuestionAnswer(text);
+        inputText = "";
+        shouldScroll = true;
+        AiChatService.Conversation.Add(qa);
+        AiChatService.AnswerQuestionCancellationTokenSource = new CancellationTokenSource();
+
+        if (textarea?.Element is not null)
+        {
+            await textarea.Element.Value.FocusAsync();
+        }
+
+        await AiChatService.AnswerQuestionAsync(qa);
+
+        AiChatService.AnswerQuestionCancellationTokenSource = null;
+        shouldScroll = true;
+    }
+
+    Task CancelQuestionAsync()
+    {
+        AiChatService.AnswerQuestionCancellationTokenSource?.Cancel();
+        AiChatService.AnswerQuestionCancellationTokenSource = null;
+
+        return Task.CompletedTask;
+    }
+
+    async Task QuickAnswerAsync(string question)
+    {
+        inputText = question;
+        await AnswerQuestionAsync();
+    }
+}
