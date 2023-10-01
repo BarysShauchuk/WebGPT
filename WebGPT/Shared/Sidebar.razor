@@ -14,17 +14,17 @@
         <i class="bi bi-box-arrow-up-right fs-5 ms-auto me-3 right-onhover"></i>
     </a>
     <div class="text-light p-1 overflow-auto fw-light">
-        <h5>
+        <h6>
             WebGPT
-        </h5>
+        </h6>
         <p>
-            This is an Artificial Intelligence. It uses OpenAI's GPT-3.5 API together with Google Search API. It can everything GPT-3.5 can, but with up-to-date answers, based on Google search results.
+            This is an Artificial Intelligence powered by OpenAI's GPT-3.5 API and integrated with Google Search API. It is capable of performing tasks similar to GPT-3.5 but provides more accurate and up-to-date answers based on real-time information from Google search results.
         </p>
         <h6>
             Disclaimer
         </h6>
         <p>
-            This AI may answer with unappropriated, unethical or illegal content. Please do not bla-bla-bla. Using this app you agree that such kind of content doesn't injures you and you bla-bla-bla
+            The AI-generated responses may occasionally contain inappropriate, unethical, or illegal content. Kindly refrain from engaging with such responses. By using this application, you agree that any exposure to such content does not cause harm or offense, and you accept responsibility for your interactions with the AI-generated responses.
         </p>
         <h6>
             Used APIs
@@ -57,9 +57,9 @@
 </div>
 
 @code {
-    async Task StartOver()
+    void StartOver()
     {
-        await AiChatService.ClearConversationAsync();
+        AiChatService.ClearConversation();
         NavigationManager.NavigateTo("/", true);
     }
 }

@@ -1,4 +1,5 @@
 ﻿@page "/"
+@using Azure.AI.OpenAI;
 @using WebGPT.Data
 @using WebGPT.Data.ChatService;
 @using WebGPT.Data.Models;
@@ -8,7 +9,7 @@
 <PageTitle>WebGPT - Chat</PageTitle>
 
 <div class="flex-grow-1 p-2 pt-0 d-flex flex-column overflow-auto" id="messages">
-    @if(AiChatService.Conversation.Count == 0)
+    @if(AiChatService.Conversation.Count == 1)
     {
         <div class="text-light m-auto  d-flex flex-column align-items-center">
             No questions yet? Let's start the conversation!
@@ -24,28 +25,40 @@
         </div>
     }
 
-    @foreach(var qa in AiChatService.Conversation)
+    @foreach(var message in AiChatService.Conversation)
     {
-
-        <div class="text-light border rounded-1 p-2 align-self-end mb-3 text-wrapped" style="max-width: 75%;">
-            @qa.Question
-        </div>
-
-        if (qa == lastQa)
+        if (AiChatService.Conversation.Last() == message)
         {
             <div id="last-qa"></div>
         }
 
-        if (qa.Answer is not null)
+        if (message.Role == ChatRole.User)
         {
-            <div class="bg-light border rounded-1 p-2 align-self-start mb-3 p_m-0" style="max-width: 75%;">
-                @((MarkupString)qa.Answer)
+            <div class="text-light border rounded-1 p-2 align-self-end mb-3 text-wrapped" style="max-width: 75%;">
+                @message.Content
             </div>
         }
-        else if (qa != lastQa || !isAnswering)
+        else if (message.Role == ChatRole.Assistant)
         {
-            <div class="bg-light text-danger fw-bold border border-danger rounded-1 p-2 align-self-start mb-3" style="max-width: 75%;">
-                Question was canceled.
+            if (message.FunctionCall?.Name == "search_web")
+            {
+                <div class="text-light align-self-start ms-0 mb-2 ps-2 fw-light">
+                    <i class="bi bi-globe2 me-1"></i> 
+                    Searching Google - 
+                    <b>@AiChatService.GetSearchWebFunctionQuery(message.FunctionCall.Arguments)</b>
+                </div>
+            }
+            else if (message is MdChatMessage mdMessage)
+            {
+                <div class="bg-light border rounded-1 p-2 align-self-start mb-3 p_m-0" style="max-width: 75%;">
+                    @((MarkupString)mdMessage.MarkdownContent)
+                </div>
+            }
+        }
+        else if (message.Role == ChatRole.System && message.Content == questionCanceledMessage)
+        {
+            <div class="text-danger align-self-start ms-0 mb-2 ps-2 fw-light">
+                <i class="bi bi-x-circle me-1"></i> <b>@questionCanceledMessage</b>
             </div>
         }
     }
@@ -56,7 +69,7 @@
             <div class="spinner-grow me-3" role="status">
                 <span class="visually-hidden">Loading...</span>
             </div>
-            <b class="me-2">
+            <b class="me-3">
                 Generating answer...
             </b>
             <button @onclick="CancelQuestionAsync" class="btn btn-outline-danger ms-5 minimize-onhover-pointer">
@@ -64,6 +77,19 @@
                 Cancel
             </button>
         </div>
+
+        @* <div class="bg-light fw-light  rounded-1 px-2 pe-1 py-1 align-self-start mb-3 d-flex align-items-center">
+            <div class="spinner-border spinner-border-sm me-2" role="status">
+                <span class="visually-hidden">Loading...</span>
+            </div>
+            <b class="me-5">
+                Generating answer...
+            </b>
+            <button @onclick="CancelQuestionAsync" class="btn btn-sm btn-outline-danger ms-5 minimize-onhover-pointer">
+                <i class="bi bi-dash-square-fill me-1 minimize-onhover"></i>
+                Cancel
+            </button>
+        </div> *@
     }
 
 </div>
@@ -80,18 +106,20 @@
 </div>
 
 @code {
-        QuestionAnswer? lastQa => AiChatService.Conversation.LastOrDefault();
-        bool isAnswering => AiChatService.AnswerQuestionCancellationTokenSource is not null;
-        string inputText = "";
+    //QuestionAnswer? lastQa => AiChatService.Conversation.LastOrDefault();
+    bool isAnswering => AiChatService.AnswerQuestionCancellationTokenSource is not null;
+    string inputText = "";
 
-        ElementReference sendButton;
-        InputTextArea? textarea;
+    const string questionCanceledMessage = "Question was canceled.";
 
-        bool shouldScroll = true;
-        bool shouldSubmit = false;
+    ElementReference sendButton;
+    InputTextArea? textarea;
 
-        string[][] suggestedQuestions = new string[][]
-        {
+    bool shouldScroll = true;
+    bool shouldSubmit = false;
+
+    string[][] suggestedQuestions = new string[][]
+    {
         new[] { "Tell about yourself", "bi bi-stars" },
         new[] { "What's the weather like today?", "bi bi-cloud-moon-fill"},
         new[] { "Places to visit in Kaunas", "bi bi-buildings" }
@@ -107,6 +135,13 @@
             {
                 await textarea.Element.Value.FocusAsync();
             }
+
+            AiChatService.Conversation.CollectionChanged += async (_, _) => 
+                await InvokeAsync(() =>
+                {
+                    shouldScroll = true;
+                    StateHasChanged();
+                });
         }
 
         if (shouldScroll)
@@ -149,10 +184,9 @@
             return;
         }
 
-        var qa = new QuestionAnswer(text);
         inputText = "";
+        AiChatService.Conversation.Add(new ChatMessage(ChatRole.User, text));
         shouldScroll = true;
-        AiChatService.Conversation.Add(qa);
         AiChatService.AnswerQuestionCancellationTokenSource = new CancellationTokenSource();
 
         if (textarea?.Element is not null)
@@ -160,18 +194,18 @@
             await textarea.Element.Value.FocusAsync();
         }
 
-        await AiChatService.AnswerQuestionAsync(qa);
+        await AiChatService.AnswerLastQuestionAsync();
 
         AiChatService.AnswerQuestionCancellationTokenSource = null;
         shouldScroll = true;
     }
 
-    Task CancelQuestionAsync()
+    void CancelQuestionAsync()
     {
         AiChatService.AnswerQuestionCancellationTokenSource?.Cancel();
         AiChatService.AnswerQuestionCancellationTokenSource = null;
 
-        return Task.CompletedTask;
+        AiChatService.Conversation.Add(new ChatMessage(ChatRole.System, questionCanceledMessage));
     }
 
     async Task QuickAnswerAsync(string question)

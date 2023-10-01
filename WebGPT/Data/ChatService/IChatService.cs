@@ -1,15 +1,18 @@
-﻿using WebGPT.Data.Models;
+﻿using Azure.AI.OpenAI;
+using System.Collections.ObjectModel;
 
 namespace WebGPT.Data.ChatService
 {
     public interface IChatService
     {
-        public List<QuestionAnswer> Conversation { get; set; }
+        public ObservableCollection<ChatMessage> Conversation { get; set; }
 
         public CancellationTokenSource? AnswerQuestionCancellationTokenSource { get; set; }
 
-        public Task AnswerQuestionAsync(QuestionAnswer qa);
+        public Task AnswerLastQuestionAsync();
 
-        public Task ClearConversationAsync();
+        public void ClearConversation();
+
+        public string? GetSearchWebFunctionQuery(string json);
     }
 }

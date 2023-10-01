@@ -1,12 +1,13 @@
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Web;
-using Azure.Core;
 using Microsoft.Extensions.Azure;
 using WebGPT.Data;
-using WebGPT.Data.AiService;
 using WebGPT.Data.ChatService;
 using WebGPT.Data.MarkdownService;
 using WebGPT.Configuration;
+using Azure.AI.OpenAI;
+using Microsoft.Extensions.Options;
+using WebGPT.Data.SearchService;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,12 +15,17 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<IChatService, ChatService>();
-builder.Services.AddSingleton<IAiService, FakeAiService>();
+builder.Services.AddSingleton<ISearchService, SearchService>();
 builder.Services.AddSingleton<IMarkdownService, GitLabMarkdownService>();
 
 builder.Services.AddHttpClient();
 builder.Services.ConfigureNamedOptions<ApiSettings>(
     builder.Configuration.GetSection("ApiOptions"));
+
+builder.Services.AddSingleton<OpenAIClient>((services) => 
+    new OpenAIClient(
+        services.GetRequiredService<IOptionsMonitor<ApiSettings>>()
+                .Get("OpenAi").ApiKey));
 
 var app = builder.Build();
 
