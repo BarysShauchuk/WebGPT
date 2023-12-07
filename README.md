@@ -14,7 +14,6 @@ This is a Blazor Server Application - AI Chat. It combines OpenAI's GPT-3.5 Turb
       "ApiKey": "[your api key]"
     },
     "OpenAi": {
-      "BaseUrl": "",
       "ApiKey": "[your api key]"
     },
     "Google": {
