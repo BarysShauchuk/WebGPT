@@ -43,8 +43,8 @@
             if (message.FunctionCall?.Name == "search_web")
             {
                 <div class="text-light align-self-start ms-0 mb-2 ps-2 fw-light">
-                    <i class="bi bi-globe2 me-1"></i> 
-                    Searching Google - 
+                    <i class="bi bi-globe2 me-1"></i>
+                    Searching Brave -
                     <b>@AiChatService.GetSearchWebFunctionQuery(message.FunctionCall.Arguments)</b>
                 </div>
             }
@@ -55,10 +55,16 @@
                 </div>
             }
         }
-        else if (message.Role == ChatRole.System && message.Content == questionCanceledMessage)
+        else if (message.Role == ChatRole.System && message.Content == IChatService.QuestionCanceledMessage)
         {
             <div class="text-danger align-self-start ms-0 mb-2 ps-2 fw-light">
-                <i class="bi bi-x-circle me-1"></i> <b>@questionCanceledMessage</b>
+                <i class="bi bi-x-circle me-1"></i> <b>@message.Content</b>
+            </div>
+        }
+        else if (message.Role == ChatRole.System && message.Content == IChatService.ErrorAnsweringQuestionMessage)
+        {
+            <div class="text-danger align-self-start ms-0 mb-2 ps-2 fw-light">
+                <i class="bi bi-bug me-1"></i> <b>@message.Content</b>
             </div>
         }
     }
@@ -109,8 +115,6 @@
     //QuestionAnswer? lastQa => AiChatService.Conversation.LastOrDefault();
     bool isAnswering => AiChatService.AnswerQuestionCancellationTokenSource is not null;
     string inputText = "";
-
-    const string questionCanceledMessage = "Question was canceled.";
 
     ElementReference sendButton;
     InputTextArea? textarea;
@@ -205,7 +209,8 @@
         AiChatService.AnswerQuestionCancellationTokenSource?.Cancel();
         AiChatService.AnswerQuestionCancellationTokenSource = null;
 
-        AiChatService.Conversation.Add(new ChatMessage(ChatRole.System, questionCanceledMessage));
+        AiChatService.Conversation.Add(
+            new ChatMessage(ChatRole.System, IChatService.QuestionCanceledMessage));
     }
 
     async Task QuickAnswerAsync(string question)

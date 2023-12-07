@@ -170,3 +170,7 @@ pre {
     .blazor-error-boundary::after {
         content: "An error has occurred."
     }
+
+a{
+    word-wrap: break-word;
+}

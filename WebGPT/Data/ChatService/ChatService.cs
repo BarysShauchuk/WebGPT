@@ -13,7 +13,23 @@ namespace WebGPT.Data.ChatService
 {
     public class ChatService : IChatService
     {
-        public const string AiChatModelName = "gpt-3.5-turbo";
+        public const string SystemInstructionsToken = "fsdfsdnj3943nj-3o0_mfnsd";
+        public const string AiChatModelName_gpt3_5_turbo = "gpt-3.5-turbo-0613";
+        public const string AiChatModelName_gpt4 = "gpt-4-0613";
+        public const string AiChatModelName_gpt4_preview = "gpt-4-1106-preview";
+
+        public const string AiChatModelName = AiChatModelName_gpt4_preview;
+
+        public const string InitialSystemMessage =
+            $"""
+            Your name is WebGPT.
+            You are AI chatbot with web search integration, use it in case you need up-to-date information.
+            Summarize web pages and give the answer in a short form. At the end of every message, list the sources.
+            Your creator is Barys Shauchuk (when mentioned, use this url: https://github.com/BarysShauchuk). 
+            Generate your answers using markdown and emoji.
+            Answer in a sarcastic manner, but you should always be helpful.
+            If the message starts with "{SystemInstructionsToken}" this is a system instruction, follow it.
+            """;
 
         private readonly OpenAIClient client;
         private readonly ISearchService searchService;
@@ -23,7 +39,7 @@ namespace WebGPT.Data.ChatService
         public ChatService(
             OpenAIClient client,
             ISearchService searchService,
-            IMarkdownService markdownService, 
+            IMarkdownService markdownService,
             ILogger<ChatService> logger)
         {
             this.client = client;
@@ -52,85 +68,136 @@ namespace WebGPT.Data.ChatService
 
             var token = this.AnswerQuestionCancellationTokenSource.Token;
 
-            var answer = await this.GenerateAsync(token);
-            var markdown = await markdownService.MarkdownToHtmlAsync(answer.Content, token);
-            var markdownAnswer = new MdChatMessage(answer, markdown ?? string.Empty);
+            try
+            {
+                var answer = await this.GenerateAsync(token);
+                var markdown = await markdownService.MarkdownToHtmlAsync(answer.Content, token);
+                var markdownAnswer = new MdChatMessage(answer, markdown ?? string.Empty);
 
-            this.Conversation.Add(markdownAnswer);
+                this.Conversation.Add(markdownAnswer);
+            }
+            catch (Exception ex)
+            {
+                logger.LogError(ex, "Error while answering last question");
+                if (ex is not TaskCanceledException)
+                {
+                    this.Conversation.Add(
+                        new ChatMessage(ChatRole.System, IChatService.ErrorAnsweringQuestionMessage));
+                }
+            }
+            finally
+            {
+                foreach (var function in this.Conversation.Where(x => x.Role == ChatRole.Function))
+                {
+                    function.Content = "[No longer available.]";
+                }
+            }
+        }
+
+        private struct FunctionsLimits
+        {
+            public const int MaxWebSearches = 3;
+            public const int MaxPagesGets = 10;
+
+            public FunctionsLimits()
+            {
+            }
+
+            public int WebSearches { get; set; } = 0;
+            public int PagesGets { get; set; } = 0;
+
+            public readonly bool IsWebSearchesLimitReached =>
+                WebSearches >= MaxWebSearches ||
+                PagesGets >= MaxPagesGets;
+
+            public readonly bool IsPagesGetsLimitReached => PagesGets >= MaxPagesGets;
         }
 
         private async Task<ChatMessage> GenerateAsync(CancellationToken token)
         {
-            var options = new ChatCompletionsOptions(this.Conversation);
-            options.Functions.Add(searchWebFunctionDefinition);
-            options.Functions.Add(getPageFunctionDefinition);
+            var limits = new FunctionsLimits();
 
-            var response = await client.GetChatCompletionsAsync(AiChatModelName, options, token);
-            var responseChoice = response.Value.Choices[0];
-
-            logger.LogInformation(
-                $"""
-                Stop reason: {responseChoice.FinishReason}
-                AI answer: {responseChoice.Message.Content}
-                """);
-
-            if (responseChoice.FinishReason == CompletionsFinishReason.FunctionCall)
+            while (true)
             {
+                var options = new ChatCompletionsOptions(this.Conversation);
+                options.Functions.Add(searchWebFunctionDefinition);
+                options.Functions.Add(getPageFunctionDefinition);
+
+                if (limits.IsWebSearchesLimitReached)
+                {
+                    options.Functions.Remove(searchWebFunctionDefinition);
+                }
+
+                if (limits.IsPagesGetsLimitReached)
+                {
+                    options.Functions.Remove(getPageFunctionDefinition);
+                }
+
+                var response = await client.GetChatCompletionsAsync(AiChatModelName, options, token);
+                var responseChoice = response.Value.Choices[0];
+
+                logger.LogInformation(
+                    $"""
+                    Stop reason: {responseChoice.FinishReason}
+                    AI answer: {responseChoice.Message.Content}
+                    """);
+
+                if (responseChoice.FinishReason != CompletionsFinishReason.FunctionCall)
+                {
+                    return responseChoice.Message;
+                }
+
                 this.Conversation.Add(responseChoice.Message);
 
                 var functionName = responseChoice.Message.FunctionCall.Name;
+                string unvalidatedArguments = responseChoice.Message.FunctionCall.Arguments;
+
+                object functionResultData = new
+                {
+                    Error = "Function not found"
+                };
 
                 if (functionName == "search_web")
                 {
-                    // Validate and process the JSON arguments for the function call
-                    string unvalidatedArguments = responseChoice.Message.FunctionCall.Arguments;
+                    limits.WebSearches++;
 
                     var query = GetSearchWebFunctionQuery(unvalidatedArguments);
                     var searchResult = await this.searchService.SearchAsync(query);
 
-                    object functionResultData = new
+                    functionResultData = new
                     {
                         PagesUrls = searchResult
                     };
-
-                    var functionResponseMessage = new ChatMessage(
-                        ChatRole.Function,
-                        JsonSerializer.Serialize(
-                            functionResultData,
-                            jsonSerializerOptions))
-                    {
-                        Name = responseChoice.Message.FunctionCall.Name
-                    };
-
-                    this.Conversation.Add(functionResponseMessage);
                 }
                 else if (functionName == "get_page")
                 {
-                    // Validate and process the JSON arguments for the function call
-                    string unvalidatedArguments = responseChoice.Message.FunctionCall.Arguments;
+                    limits.PagesGets++;
+
                     var url = GetGetPageFunctionUrl(unvalidatedArguments);
                     var page = await this.searchService.GetPageAsync(url);
-                    object functionResultData = new
+
+                    functionResultData = new
                     {
                         PageBodyHtml = page
                     };
+                }
 
-                    var functionResponseMessage = new ChatMessage(
+                AddFunctionResponseMessage(functionName, functionResultData);
+            }
+        }
+
+        private void AddFunctionResponseMessage(string functionName, object functionResultData)
+        {
+            var functionResponseMessage = new ChatMessage(
                         ChatRole.Function,
                         JsonSerializer.Serialize(
                             functionResultData,
                             jsonSerializerOptions))
-                    {
-                        Name = responseChoice.Message.FunctionCall.Name
-                    };
+            {
+                Name = functionName
+            };
 
-                    this.Conversation.Add(functionResponseMessage);
-                }
-
-                return await this.GenerateAsync(token);
-            }
-
-            return responseChoice.Message;
+            this.Conversation.Add(functionResponseMessage);
         }
 
         public void ClearConversation()
@@ -143,11 +210,9 @@ namespace WebGPT.Data.ChatService
                 new ChatMessage
                 {
                     Role = ChatRole.System,
-                    Content = "Your name is WebGPT. You are AI chatbot with Google Search integration. Your creator is Barys Shauchuk (when mentioned, use this url: https://github.com/BarysShauchuk). Generate your answers using markdown and emoji."
+                    Content = InitialSystemMessage,
                 }
             };
-
-            
         }
 
         public string? GetSearchWebFunctionQuery(string json)
@@ -183,7 +248,7 @@ namespace WebGPT.Data.ChatService
         private FunctionDefinition searchWebFunctionDefinition = new FunctionDefinition
         {
             Name = "search_web",
-            Description = "Search query in the web. Return list of URLs.",
+            Description = $"Search query in the web. Return list of URLs. The current limit is {FunctionsLimits.MaxWebSearches} per answer.",
             Parameters = BinaryData.FromObjectAsJson(
                     new
                     {
@@ -203,7 +268,7 @@ namespace WebGPT.Data.ChatService
         private FunctionDefinition getPageFunctionDefinition = new FunctionDefinition
         {
             Name = "get_page",
-            Description = "Get page content by URL.",
+            Description = $"Get page content by URL. The current limit is {FunctionsLimits.MaxPagesGets} per answer.",
             Parameters = BinaryData.FromObjectAsJson(
                     new
                     {
