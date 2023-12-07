@@ -1,6 +1,6 @@
 # WebGPT
 
-This is a Blazor Server Application - AI Chat. It combines OpenAI's GPT-3.5 Turbo model and Google Search API. 
+This is a Blazor Server Application - AI Chat. It combines OpenAI's GPT-3.5 Turbo model and Brave Search API. 
 
 ## Startup
 
@@ -16,8 +16,8 @@ This is a Blazor Server Application - AI Chat. It combines OpenAI's GPT-3.5 Turb
     "OpenAi": {
       "ApiKey": "[your api key]"
     },
-    "Google": {
-      "BaseUrl": "",
+    "Brave": {
+      "BaseUrl": "https://api.search.brave.com/res/v1",
       "ApiKey": "[your api key]"
     }
   },
