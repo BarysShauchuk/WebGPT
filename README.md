@@ -1,6 +1,16 @@
 # WebGPT
 
-This is a Blazor Server Application - AI Chat. It combines OpenAI's GPT-3.5 Turbo model and Brave Search API. 
+This is a Blazor Server Application - AI Chat. This project is a proof of concept of a system that combines the power of GPT models and search engines. The system can answer questions and assist in various tasks using up-to-date information from the web.
+
+## Technologies
+
+- .NET 7
+- Blazor Server App
+- Azure.AI.OpenAI NuGet package
+- OpenAI GPT-4-1106-preview API
+- Brave Search API for AI inference
+- GitLab Markdown API
+- Bootstrap styles
 
 ## Startup
 
