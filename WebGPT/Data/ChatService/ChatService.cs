@@ -16,7 +16,7 @@ namespace WebGPT.Data.ChatService
         public const string SystemInstructionsToken = "fsdfsdnj3943nj-3o0_mfnsd";
         public const string AiChatModelName_gpt3_5_turbo = "gpt-3.5-turbo-0613";
         public const string AiChatModelName_gpt4 = "gpt-4-0613";
-        public const string AiChatModelName_gpt4_preview = "gpt-4-1106-preview";
+        public const string AiChatModelName_gpt4_preview = "gpt-4o";
 
         public const string AiChatModelName = AiChatModelName_gpt4_preview;
 
@@ -120,8 +120,8 @@ namespace WebGPT.Data.ChatService
             while (true)
             {
                 var options = new ChatCompletionsOptions(this.Conversation);
-                options.Functions.Add(searchWebFunctionDefinition);
-                options.Functions.Add(getPageFunctionDefinition);
+                //options.Functions.Add(searchWebFunctionDefinition);
+                //options.Functions.Add(getPageFunctionDefinition);
 
                 if (limits.IsWebSearchesLimitReached)
                 {

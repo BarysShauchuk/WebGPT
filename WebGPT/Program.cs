@@ -16,7 +16,8 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 builder.Services.AddSingleton<IChatService, ChatService>();
 builder.Services.AddSingleton<ISearchService, SearchService>();
-builder.Services.AddSingleton<IMarkdownService, GitLabMarkdownService>();
+//builder.Services.AddSingleton<IMarkdownService, GitLabMarkdownService>();
+builder.Services.AddSingleton<IMarkdownService, NoMarkdownService>();
 
 builder.Services.AddHttpClient();
 builder.Services.ConfigureNamedOptions<ApiSettings>(
